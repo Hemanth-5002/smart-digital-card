@@ -170,6 +170,9 @@ async function loadStudentCard() {
         const qrImageSrc = `data:image/png;base64,${student.qr_code}`;
         const isFull = urlParams.get('full') === 'true';
 
+        const rawLinkedIn = (student.linkedin || '').trim();
+        const linkedinUrl = rawLinkedIn ? (rawLinkedIn.match(/^https?:\/\//i) ? rawLinkedIn : `https://${rawLinkedIn}`) : '';
+
         const attendanceValue = parseInt(student.attendance) || 0;
         let attendanceColor = 'bg-success';
         if (attendanceValue < 75) attendanceColor = 'bg-warning';
@@ -188,8 +191,13 @@ async function loadStudentCard() {
                 <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Marks:</span> <strong>${student.marks || 'N/A'}</strong></div>
                 <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Fees:</span> <span class="badge ${student.fees_status === 'Paid' ? 'bg-success' : 'bg-danger'}">${student.fees_status}</span></div>
                 <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Library:</span> <strong>${student.library_books}</strong></div>
-                <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>LinkedIn:</span> <a href="${student.linkedin || '#'}" target="_blank" class="badge bg-primary text-decoration-none">View Profile</a></div>
+                <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>LinkedIn:</span> ${linkedinUrl ? `<a href="${linkedinUrl}" target="_blank" class="badge bg-primary text-decoration-none">View Profile</a>` : '<span class="text-muted">N/A</span>'}</div>
                 
+                <div class="text-center mt-2">
+                    <button id="share-url-btn" class="btn btn-sm btn-outline-success">Copy shareable link</button>
+                    <span id="share-url-msg" class="ms-2 text-success" style="display:none;">Copied!</span>
+                </div>
+
                 <div class="mt-3">
                     <div class="d-flex justify-content-between small fw-bold text-muted mb-1">
                         <span>Attendance Progress</span>
@@ -226,6 +234,32 @@ async function loadStudentCard() {
             </div>
         `;
         
+        const shareBtn = document.getElementById('share-url-btn');
+        const shareMsg = document.getElementById('share-url-msg');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', async () => {
+                const shareUrl = window.location.href;
+                if (navigator.share) {
+                    try {
+                        await navigator.share({ title: `${student.name} | Digital ID`, url: shareUrl });
+                        return;
+                    } catch (err) {
+                        // user may cancel share; proceed to copy fallback
+                    }
+                }
+
+                try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    if (shareMsg) {
+                        shareMsg.style.display = 'inline';
+                        setTimeout(() => { shareMsg.style.display = 'none'; }, 1800);
+                    }
+                } catch (err) {
+                    alert('Copy failed. Please copy the link manually: ' + shareUrl);
+                }
+            });
+        }
+
         if (isFull) {
             setInterval(() => {
                 const clock = document.getElementById('live-clock');
