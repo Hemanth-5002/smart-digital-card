@@ -18,7 +18,7 @@ def get_local_ip():
         s.close()
     return IP
 
-frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
+frontend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
 app = Flask(__name__, static_folder=frontend_path, static_url_path='')
 CORS(app)
 
@@ -85,7 +85,7 @@ def add_student():
     # Generate QR Code
     local_ip = get_local_ip()
     port = request.host.split(':')[-1] if ':' in request.host else '5000'
-    base_url = f"http://{local_ip}:{port}"
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", f"http://{local_ip}:{port}")
     qr_data = f"{base_url}/student.html?usn={register_number}&full=true"
     qr = qrcode.QRCode(version=1, box_size=6, border=4)
     qr.add_data(qr_data)
@@ -167,6 +167,8 @@ def delete_student(register_number):
 
 import os
 
+init_db()
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Render provides PORT
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
