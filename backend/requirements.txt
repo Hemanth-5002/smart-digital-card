@@ -1,0 +1,6 @@
+Flask
+Flask-Cors
+qrcode
+Pillow
+gunicorn
+python-pptx
