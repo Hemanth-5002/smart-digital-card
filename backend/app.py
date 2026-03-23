@@ -7,6 +7,9 @@ from io import BytesIO
 import base64
 import socket
 
+# --- SETTINGS ---
+NGROK_URL = None # Ngrok disabled as per user preference
+
 def get_local_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -50,9 +53,21 @@ def init_db():
             marks TEXT,
             linkedin TEXT,
             photo TEXT,
-            qr_code TEXT
+            qr_code TEXT,
+            password TEXT NOT NULL DEFAULT '123456',
+            resume TEXT,
+            github TEXT,
+            marks_10th TEXT,
+            marks_puc TEXT
         )
     ''')
+    # Migrations for existing tables
+    columns = ["password TEXT NOT NULL DEFAULT '123456'", "resume TEXT", "github TEXT", "marks_10th TEXT", "marks_puc TEXT"]
+    for col in columns:
+        try:
+            c.execute(f'ALTER TABLE students ADD COLUMN {col}')
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
     conn.close()
 
@@ -75,17 +90,23 @@ def add_student():
     attendance = data.get('attendance', '0%')
     fees_status = data.get('fees_status', 'Pending')
     contact = data.get('contact', 'N/A')
-    library_books = data.get('library_books', 'None')
+    library_books = data.get('library_books', 'N/A')
     email = data.get('email', 'N/A')
     dob = data.get('dob', 'N/A')
     marks = data.get('marks', 'N/A')
     linkedin = data.get('linkedin', 'N/A')
     photo = data.get('photo', '')
+    password = data.get('password', '123456')
+    resume = data.get('resume', '')
+    github = data.get('github', '')
+    marks_10th = data.get('marks_10th', '')
+    marks_puc = data.get('marks_puc', '')
     
-    # Generate QR Code
+    # Generate QR Code URL
     local_ip = get_local_ip()
     port = request.host.split(':')[-1] if ':' in request.host else '5000'
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", f"http://{local_ip}:{port}")
+    base_url = f"http://{local_ip}:{port}"
+        
     qr_data = f"{base_url}/student.html?usn={register_number}&full=true"
     qr = qrcode.QRCode(version=1, box_size=6, border=4)
     qr.add_data(qr_data)
@@ -100,13 +121,13 @@ def add_student():
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
         c.execute('''
-            INSERT INTO students (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code_base64))
+            INSERT INTO students (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code, password, resume, github, marks_10th, marks_puc)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code_base64, password, resume, github, marks_10th, marks_puc))
         conn.commit()
         conn.close()
         return jsonify({"message": "Student added successfully!"}), 201
-    except sqlite3.IntegrityError:
+    except sqlite3.IntegrityError as e:
         return jsonify({"error": "Register number already exists!"}), 400
 
 @app.route('/api/students/<register_number>', methods=['PUT'])
@@ -122,25 +143,76 @@ def update_student(register_number):
     dob = data.get('dob', 'N/A')
     marks = data.get('marks', 'N/A')
     linkedin = data.get('linkedin', 'N/A')
+    
     photo = data.get('photo', '')
+    password = data.get('password')
+    resume = data.get('resume')
+    github = data.get('github')
+    marks_10th = data.get('marks_10th', '')
+    marks_puc = data.get('marks_puc', '')
+
+    # Update QR Code with current base URL
+    local_ip = get_local_ip()
+    port = request.host.split(':')[-1] if ':' in request.host else '5000'
+    base_url = f"http://{local_ip}:{port}"
+    
+    qr_data = f"{base_url}/student.html?usn={register_number}&full=true"
+    qr = qrcode.QRCode(version=1, box_size=6, border=4)
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    img = qr.make_image(fill='black', back_color='white')
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
+    base_query = 'UPDATE students SET name=?, course=?, attendance=?, fees_status=?, library_books=?, contact=?, email=?, dob=?, marks=?, linkedin=?, qr_code=?, resume=?, github=?, marks_10th=?, marks_puc=?'
+    params = [name, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, qr_code_base64, resume, github, marks_10th, marks_puc]
+
     if photo:
-        c.execute('''
-            UPDATE students SET name=?, course=?, attendance=?, fees_status=?, library_books=?, contact=?, email=?, dob=?, marks=?, linkedin=?, photo=?
-            WHERE register_number=?
-        ''', (name, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, register_number))
-    else:
-        c.execute('''
-            UPDATE students SET name=?, course=?, attendance=?, fees_status=?, library_books=?, contact=?, email=?, dob=?, marks=?, linkedin=?
-            WHERE register_number=?
-        ''', (name, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, register_number))
+        base_query += ', photo=?'
+        params.append(photo)
+    if password:
+        base_query += ', password=?'
+        params.append(password)
         
+    base_query += ' WHERE register_number=?'
+    params.append(register_number)
+    
+    c.execute(base_query, tuple(params))
     conn.commit()
     conn.close()
     return jsonify({"message": "Student updated successfully!"}), 200
+
+@app.route('/api/students/refresh-qrs', methods=['POST'])
+def refresh_all_qrs():
+    local_ip = get_local_ip()
+    port = request.host.split(':')[-1] if ':' in request.host else '5000'
+    base_url = f"http://{local_ip}:{port}"
+    
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT register_number FROM students')
+    students = c.fetchall()
+    
+    for s in students:
+        usn = s['register_number']
+        qr_data = f"{base_url}/student.html?usn={usn}&full=true"
+        qr = qrcode.QRCode(version=1, box_size=6, border=4)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        img = qr.make_image(fill='black', back_color='white')
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        c.execute('UPDATE students SET qr_code=? WHERE register_number=?', (qr_code_base64, usn))
+    
+    conn.commit()
+    conn.close()
+    return jsonify({"message": f"Successfully refreshed all QR codes using {base_url}!"}), 200
 
 @app.route('/api/students/<register_number>', methods=['GET'])
 def get_student(register_number):
@@ -150,11 +222,24 @@ def get_student(register_number):
     c.execute('SELECT * FROM students WHERE register_number = ?', (register_number,))
     student = c.fetchone()
     conn.close()
-    
     if student:
         return jsonify(dict(student))
-    else:
-        return jsonify({"error": "Student not found!"}), 404
+    return jsonify({"error": "Student not found!"}), 404
+
+@app.route('/api/login', methods=['POST'])
+def student_login():
+    data = request.json
+    usn = data.get('usn')
+    password = data.get('password')
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM students WHERE register_number = ? AND password = ?', (usn, password))
+    student = c.fetchone()
+    conn.close()
+    if student:
+        return jsonify({"success": True, "message": "Login successful!"})
+    return jsonify({"success": False, "error": "Invalid USN or Password!"}), 401
 
 @app.route('/api/students/<register_number>', methods=['DELETE'])
 def delete_student(register_number):
@@ -164,8 +249,6 @@ def delete_student(register_number):
     conn.commit()
     conn.close()
     return jsonify({"message": "Student deleted successfully!"}), 200
-
-import os
 
 init_db()
 
