@@ -1,6 +1,7 @@
-const API_BASE = (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? "http://127.0.0.1:5000/api"
-    : window.location.origin + "/api";
+const API_BASE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? (window.location.port === "5000" ? "/api" : "http://localhost:5000/api")
+    : (window.location.protocol === "file:" ? "http://localhost:5000/api" : "/api");
+
 
 const loginForm = document.getElementById("student-login-form");
 if (loginForm) {
@@ -26,7 +27,7 @@ if (loginForm) {
                 }
             } catch (error) {
                 console.error("Login error", error);
-                errorDiv.innerText = "Connection error. Make sure backend is running.";
+                errorDiv.innerText = "Connection error. Make sure the backend server (app.py) is running on port 5000.";
             }
         }
     });
@@ -55,6 +56,7 @@ if (addStudentForm) {
             course: document.getElementById("add-course").value,
             attendance: document.getElementById("add-attendance").value,
             fees_status: document.getElementById("add-fees").value,
+            library_books: document.getElementById("add-library")?.value || 'None',
             contact: document.getElementById("add-contact").value,
             email: document.getElementById("add-email").value,
             dob: document.getElementById("add-dob").value,
@@ -65,6 +67,9 @@ if (addStudentForm) {
             github: document.getElementById("add-github").value,
             marks_10th: document.getElementById("add-marks-10th").value,
             marks_puc: document.getElementById("add-marks-puc").value,
+            blood_group: document.getElementById("add-blood-group")?.value || 'N/A',
+            emergency_contact: document.getElementById("add-emergency-contact")?.value || 'N/A',
+            skills: JSON.stringify((document.getElementById("add-skills")?.value || "").split(',').map(s => s.trim()).filter(s => s) || []),
             photo: photo
         };
 
@@ -78,7 +83,17 @@ if (addStudentForm) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            const result = await response.json();
+
+            // Try to parse JSON, if it fails, catch it and show error
+            let result;
+            try {
+                result = await response.json();
+            } catch (jsonErr) {
+                console.error("JSON Parse Error:", jsonErr);
+                messageDiv.className = "alert alert-danger mt-2 p-2 small";
+                messageDiv.innerText = "Crucial Server Error: Received non-JSON response.";
+                return;
+            }
 
             if (response.ok) {
                 messageDiv.className = "alert alert-success mt-2 p-2 small";
@@ -89,11 +104,13 @@ if (addStudentForm) {
                 loadStudents();
             } else {
                 messageDiv.className = "alert alert-danger mt-2 p-2 small";
-                messageDiv.innerText = result.error;
+                messageDiv.innerText = result.error || "Server error occurred.";
+                console.error("Save Error Response:", result);
             }
         } catch (error) {
+            console.error("Full Save Error Object:", error);
             messageDiv.className = "alert alert-danger mt-2 p-2 small";
-            messageDiv.innerText = "Error saving student.";
+            messageDiv.innerText = "Connection error. Make sure the backend server (app.py) is running on port 5000.";
         }
     });
 }
@@ -110,7 +127,10 @@ async function loadStudents() {
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>${student.register_number}</td>
-                <td>${student.name}</td>
+                <td>
+                    ${student.name}
+                    ${(student.verified_10th || student.verified_puc) ? '<span class="text-success ms-1" title="Documents Verified">✓</span>' : ''}
+                </td>
                 <td>${student.course}</td>
                 <td class="fw-bold text-primary">${student.password}</td>
                 <td>
@@ -129,7 +149,7 @@ async function editStudent(usn) {
     try {
         const response = await fetch(`${API_BASE}/students/${usn}`);
         const student = await response.json();
-        
+
         document.getElementById("add-name").value = student.name;
         document.getElementById("add-usn").value = student.register_number;
         document.getElementById("add-usn").disabled = true;
@@ -146,6 +166,19 @@ async function editStudent(usn) {
         document.getElementById("add-github").value = student.github || "";
         document.getElementById("add-marks-10th").value = student.marks_10th || "";
         document.getElementById("add-marks-puc").value = student.marks_puc || "";
+        document.getElementById("add-blood-group").value = student.blood_group || "";
+        document.getElementById("add-emergency-contact").value = student.emergency_contact || "";
+
+        let skillsStr = "";
+        try {
+            if (student.skills) {
+                const skillsArr = JSON.parse(student.skills);
+                skillsStr = Array.isArray(skillsArr) ? skillsArr.join(", ") : student.skills;
+            }
+        } catch (e) {
+            skillsStr = student.skills || "";
+        }
+        document.getElementById("add-skills").value = skillsStr;
 
         addStudentForm.dataset.mode = "edit";
         window.scrollTo(0, 0);
@@ -167,7 +200,9 @@ async function deleteStudent(usn) {
 async function loadStudentCard() {
     const urlParams = new URLSearchParams(window.location.search);
     const usn = urlParams.get('usn');
+
     const cardContainer = document.getElementById("id-card");
+    const assemblyContainer = document.getElementById("assembly-container");
 
     if (!usn) {
         cardContainer.innerHTML = `<div class="p-4 text-center text-danger">Invalid Request. No USN provided.</div>`;
@@ -185,96 +220,215 @@ async function loadStudentCard() {
         const qrImageSrc = `data:image/png;base64,${student.qr_code}`;
         const isFull = urlParams.get('full') === 'true';
 
-        const cleanLink = (url) => {
-          if (!url) return '';
-          return url.match(/^https?:\/\//i) ? url : `https://${url}`;
-        };
-
-        const linkedinUrl = cleanLink(student.linkedin);
-        const githubUrl = cleanLink(student.github);
-        const resumeUrl = cleanLink(student.resume);
-        const marks10thUrl = cleanLink(student.marks_10th);
-        const marksPucUrl = cleanLink(student.marks_puc);
-
-        const attendanceValue = parseInt(student.attendance) || 0;
-        let attendanceColor = 'bg-success';
-        if (attendanceValue < 75) attendanceColor = 'bg-warning';
-        if (attendanceValue < 50) attendanceColor = 'bg-danger';
-        
-        const badgeHTML = isFull ? `<span class="position-absolute top-50 end-0 translate-middle-y me-3 badge bg-success border border-light rounded-pill animation-pulse" style="font-size: 0.6rem; animation: pulse 2s infinite;">✔️ VERIFIED</span>` : '';
-
-        let detailsHTML = `<div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Department:</span> <strong>${student.course}</strong></div>`;
-        
-        if (isFull) {
-            detailsHTML += `
-                <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>DOB:</span> <strong>${student.dob || 'N/A'}</strong></div>
-                <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Contact:</span> <strong>${student.contact || 'N/A'}</strong></div>
-                <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Email:</span> <strong>${student.email || 'N/A'}</strong></div>
-                <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Marks:</span> <strong>${student.marks || 'N/A'}</strong></div>
-                <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span>Fees:</span> <span class="badge ${student.fees_status === 'Paid' ? 'bg-success' : 'bg-danger'}">${student.fees_status}</span></div>
-                
-                <div class="mt-3 text-start px-2">
-                    <small class="text-muted d-block mb-1 fw-bold border-bottom">🌐 SOCIAL PROFILES</small>
-                    <div class="d-flex flex-column gap-1 align-items-start">
-                       ${linkedinUrl ? `<a href="${linkedinUrl}" target="_blank" class="badge bg-primary text-decoration-none w-100 text-start">LinkedIn Profile</a>` : ''}
-                       ${githubUrl ? `<a href="${githubUrl}" target="_blank" class="badge bg-dark text-decoration-none w-100 text-start">GitHub Profile</a>` : ''}
-                       ${resumeUrl ? `<a href="${resumeUrl}" target="_blank" class="badge bg-secondary text-decoration-none w-100 text-start">Resume / Portfolio</a>` : ''}
-                    </div>
-                </div>
-
-                <div class="mt-3 text-start px-2">
-                    <small class="text-muted d-block mb-1 fw-bold border-bottom">🎓 ACADEMIC RECORDS</small>
-                    <div class="d-flex flex-column gap-1 align-items-start">
-                       ${marks10thUrl ? `<a href="${marks10thUrl}" target="_blank" class="badge bg-info text-dark text-decoration-none w-100 text-start">10th Marks Card</a>` : ''}
-                       ${marksPucUrl ? `<a href="${marksPucUrl}" target="_blank" class="badge bg-info text-dark text-decoration-none w-100 text-start">PUC Marks Card</a>` : ''}
-                    </div>
-                </div>
-
-                <div class="mt-4">
-                    <div class="d-flex justify-content-between small fw-bold text-muted mb-1">
-                        <span>Attendance Progress</span>
-                        <span>${student.attendance}</span>
-                    </div>
-                    <div class="progress shadow-sm" style="height: 10px; border-radius: 10px;">
-                        <div class="progress-bar ${attendanceColor} progress-bar-striped progress-bar-animated" role="progressbar" style="width: ${attendanceValue}%" aria-valuenow="${attendanceValue}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-            `;
-        }
-
+        // Materialize Fixed Layout Content
         cardContainer.innerHTML = `
-            <div class="id-card-header position-relative">
-                K.L.E. SOCIETY’S S. NIJALINGAPPA COLLEGE
-                ${badgeHTML}
-            </div>
-            <div class="id-card-body" style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
-                <div class="id-card-photo shadow-sm" style="background-image: url('${student.photo || ''}'); background-size: cover; background-position: center; border-radius: 50%; width: 100px; height: 100px; margin: 0 auto; border: 4px solid #0d6efd;">
-                    ${!student.photo ? '👤' : ''}
+            <div class="card-content-extreme">
+                <div class="header-strip">
+                    <p class="college-name-small">K.L.E. S. NIJALINGAPPA COLLEGE</p>
                 </div>
-                <div class="text-center mt-2 mb-3">
-                    <h5 class="mb-0 text-primary fw-bold">${student.name}</h5>
-                    <small class="text-muted fw-bold">${student.register_number}</small>
+                
+                <div class="hex-dual-container">
+                    <div class="ring-outer"></div>
+                    <div class="ring-inner"></div>
+                    <div class="hex-portrait-fixed">
+                         <img src="${student.photo || 'broken'}" 
+                              alt="Profile" 
+                              onerror="this.onerror=null; this.outerHTML='<div class=\'fallback-avatar\'>👤</div>';">
+                    </div>
                 </div>
-                <div class="id-card-details">
-                    ${detailsHTML}
+
+                <div class="text-center px-2">
+                    <h1 class="name-shimmer-fixed">${student.name}</h1>
+                    <div class="verified-pill">
+                        ✦ VERIFIED IDENTITY ✦
+                    </div>
                 </div>
-                ${!isFull ? `<div class="qr-container mt-3"><img src="${qrImageSrc}" alt="QR"><p class="small text-muted mb-0 mt-1">Scan for verification</p></div>` : ''}
+
+                <div class="scrollable-info-zone">
+                    <div class="data-chips-container">
+                        <div class="data-chip-extreme">
+                            <span class="chip-label d-block">DEPARTMENT</span>
+                            <span class="chip-value">${student.course}</span>
+                        </div>
+                        <div class="data-chip-extreme">
+                            <span class="chip-label d-block">REGISTER NUMBER</span>
+                            <span class="chip-value">${student.register_number}</span>
+                        </div>
+                        <div class="data-chip-extreme">
+                            <span class="chip-label d-block">ACCESS LEVEL</span>
+                            <span class="chip-value">${isFull ? 'AUTHORIZED RED' : 'AUTHORIZED BLUE'}</span>
+                        </div>
+                    </div>
+
+                    ${(isFull || window.location.href.includes('full=true')) ? `
+                    <div class="advanced-details-panel">
+                        <div class="detail-divider"><span>ADVANCED INTEL</span></div>
+                        
+                        <div class="detail-sub-section">
+                            <div class="detail-title">SOCIAL PROFILES</div>
+                            <div class="social-links-flex">
+                                ${student.linkedin ? `<a href="${student.linkedin}" target="_blank" class="intel-link">LINKEDIN</a>` : ''}
+                                ${student.github ? `<a href="${student.github}" target="_blank" class="intel-link">GITHUB</a>` : ''}
+                                ${student.resume ? `<a href="${student.resume}" target="_blank" class="intel-link">RESUME</a>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="detail-sub-section mt-2">
+                            <div class="detail-title">ACADEMIC RECORDS</div>
+                            <div class="marks-flex">
+                                <div class="mark-pill"><small>10TH</small> <span>${student.marks_10th || 'N/A'}</span></div>
+                                <div class="mark-pill"><small>PUC</small> <span>${student.marks_puc || 'N/A'}</span></div>
+                                <div class="mark-pill"><small>AGG</small> <span>${student.marks || 'N/A'}</span></div>
+                            </div>
+                        </div>
+
+                        <div class="detail-sub-section mt-2">
+                            <div class="detail-title">CONTACT DATA</div>
+                            <div class="contact-text">${student.email || 'N/A'}</div>
+                            <div class="contact-text">${student.contact || 'N/A'}</div>
+                        </div>
+
+                        <div class="detail-sub-section mt-2">
+                            <div class="detail-title">EMERGENCY INTEL</div>
+                            <div class="contact-text">BLOOD: <span class="text-danger fw-bold">${student.blood_group || 'N/A'}</span></div>
+                            <div class="contact-text">EMERGENCY: ${student.emergency_contact || 'N/A'}</div>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Unique Feature: Skill Hex Grid -->
+                    <div class="detail-divider mt-4"><span>SKILL NEXUS</span></div>
+                    <div class="skills-hex-container" id="skills-container-target">
+                        <!-- Populated below -->
+                    </div>
+                </div>
+
+                <div class="qr-restricted-section">
+                    <div class="reticle-frame-small">
+                        <div class="reticle-corner corner-tl"></div>
+                        <div class="reticle-corner corner-tr"></div>
+                        <div class="reticle-corner corner-bl"></div>
+                        <div class="reticle-corner corner-br"></div>
+                        <div class="laser-sweep" style="display: block; animation: laserScan 2s infinite linear;"></div>
+                        <img src="${qrImageSrc}" class="qr-img-fixed" alt="QR">
+                    </div>
+                    <div class="scan-text-blink mt-1">[ SCAN TO VERIFY ]</div>
+                </div>
             </div>
         `;
 
+        // Trust Ring Logic
+        const attendanceVal = parseInt(student.attendance) || 0;
+        const ringOuter = cardContainer.querySelector('.ring-outer');
+        if (attendanceVal >= 85) ringOuter.style.borderColor = "#00ff80";
+        else if (attendanceVal >= 75) ringOuter.style.borderColor = "#ffaa00";
+        else ringOuter.style.borderColor = "#ff0000";
+
+        // Render Skills Hex-Grid
+        const skillsContainer = document.getElementById("skills-container-target");
+        let skillsArr = [];
+        try {
+            skillsArr = JSON.parse(student.skills || '[]');
+            if (!Array.isArray(skillsArr)) skillsArr = student.skills.split(',').map(s => s.trim()).filter(s => s);
+        } catch (e) {
+            if (student.skills) skillsArr = student.skills.split(',').map(s => s.trim()).filter(s => s);
+        }
+
+        if (skillsArr.length > 0) {
+            skillsContainer.innerHTML = skillsArr.map(skill => `
+                <div class="skill-hex">
+                    <div class="skill-text">${skill.toUpperCase()}</div>
+                </div>
+            `).join('');
+        } else {
+            skillsContainer.innerHTML = '<div class="small text-muted opacity-50">NO SKILLS INDEXED</div>';
+        }
+
+        // SOS Mode Logic
+        const sosBtn = document.getElementById("sos-btn");
+        const sosOverlay = document.getElementById("sos-overlay");
+        const sosExitBtn = document.getElementById("sos-exit-btn");
+        const sosTarget = document.getElementById("sos-content-target");
+
+        sosBtn.onclick = () => {
+            document.body.classList.add('sos-active');
+            sosTarget.innerHTML = `
+                <div class="sos-card">
+                    <div class="sos-data-row">
+                        <div class="sos-label">Patient Name</div>
+                        <div class="sos-value" style="color: black;">${student.name}</div>
+                    </div>
+                    <div class="sos-data-row">
+                        <div class="sos-label">Blood Group</div>
+                        <div class="sos-value">${student.blood_group || 'UNKNOWN'}</div>
+                    </div>
+                    <div class="sos-data-row">
+                        <div class="sos-label">Emergency Contact</div>
+                        <div class="sos-value">${student.emergency_contact || student.contact || 'N/A'}</div>
+                    </div>
+                    <div class="sos-data-row">
+                        <div class="sos-label">Medical Conditions</div>
+                        <div class="sos-value" style="font-size: 1rem;">NO KNOWN ALLERGIES</div>
+                    </div>
+                    <a href="tel:${student.emergency_contact || student.contact}" class="btn-emergency-call">
+                        📞 CALL EMERGENCY CONTACT
+                    </a>
+                </div>
+            `;
+        };
+
+        sosExitBtn.onclick = () => {
+            document.body.classList.remove('sos-active');
+        };
+
+        // Start Assembly Animation
+        setTimeout(() => {
+            if (assemblyContainer) assemblyContainer.classList.add('assembled');
+        }, 100);
+
+        // Parallax Effect for Anti-Gravity Card
+        if (assemblyContainer) {
+            assemblyContainer.addEventListener("mousemove", (e) => {
+                const card = document.getElementById("id-card");
+                const { left, top, width, height } = assemblyContainer.getBoundingClientRect();
+                const x = (e.clientX - left) / width - 0.5;
+                const y = (e.clientY - top) / height - 0.5;
+                // Restricted tilt to 8 degrees as per prompt
+                card.style.transform = `rotateY(${x * 16}deg) rotateX(${y * -16}deg)`;
+            });
+            assemblyContainer.addEventListener("mouseleave", () => {
+                const card = document.getElementById("id-card");
+                card.style.transform = `rotateY(0deg) rotateX(0deg)`;
+            });
+        }
+
+        // Download Button Implementation
+        const downloadBtn = document.getElementById("download-id-btn");
+        if (downloadBtn) {
+
+            downloadBtn.onclick = () => {
+                window.print();
+            };
+        }
+
     } catch (error) {
-        cardContainer.innerHTML = `<div class="p-4 text-center text-danger">Server connection error.</div>`;
+        console.error("Student Card Load Error:", error);
+        cardContainer.innerHTML = `<div class="p-4 text-center text-danger">
+            <strong>Server Connection Error</strong><br>
+            <small>Could not connect to the database. Make sure app.py is running.</small>
+        </div>`;
     }
 }
 
 const refreshQrsBtn = document.getElementById("refresh-qrs-btn");
+
 if (refreshQrsBtn) {
     refreshQrsBtn.addEventListener("click", async () => {
         if (!confirm("This will update all QR codes so they work on phone. Continue?")) return;
-        
+
         refreshQrsBtn.disabled = true;
         refreshQrsBtn.innerText = "Fixing...";
-        
+
         try {
             const response = await fetch(`${API_BASE}/students/refresh-qrs`, { method: "POST" });
             const result = await response.json();
@@ -289,5 +443,54 @@ if (refreshQrsBtn) {
     });
 }
 
-if (document.getElementById("students-list")) loadStudents();
-if (document.getElementById("id-card")) loadStudentCard();
+// Particle Generation for Space Background
+function createParticles() {
+    const particleContainer = document.querySelector('.particles');
+    if (!particleContainer) return;
+
+    for (let i = 0; i < 50; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle-dot';
+
+        // Random positions
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        const size = Math.random() * 3 + 1;
+        const duration = Math.random() * 20 + 20;
+        const delay = Math.random() * 20;
+
+        particle.style.cssText = `
+            position: absolute;
+            top: ${y}%;
+            left: ${x}%;
+            width: ${size}px;
+            height: ${size}px;
+            background: white;
+            border-radius: 50%;
+            opacity: ${Math.random() * 0.4 + 0.1};
+            filter: blur(1px);
+            animation: drift ${duration}s linear infinite;
+            animation-delay: -${delay}s;
+        `;
+        particleContainer.appendChild(particle);
+    }
+}
+
+// Add drift animation to document styles
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `
+    @keyframes drift {
+        0% { transform: translate(0, 0); opacity: 0; }
+        10% { opacity: 0.3; }
+        90% { opacity: 0.3; }
+        100% { transform: translate(100px, -100px); opacity: 0; }
+    }
+`;
+document.head.appendChild(styleSheet);
+
+document.addEventListener("DOMContentLoaded", () => {
+    createParticles();
+    if (document.getElementById("students-list")) loadStudents();
+    if (document.getElementById("id-card")) loadStudentCard();
+});
+

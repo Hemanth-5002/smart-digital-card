@@ -4,3 +4,4 @@ qrcode
 Pillow
 gunicorn
 python-pptx
+requests

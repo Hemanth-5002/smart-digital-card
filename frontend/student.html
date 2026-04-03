@@ -4,25 +4,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital ID Card</title>
+    <title>Digital ID Card - Smart Digital Card</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Space+Mono&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body class="bg-dark d-flex justify-content-center align-items-center" style="min-height: 100vh; padding: 10px;">
-    <div class="id-card-container">
-        <div class="id-card" id="id-card">
-            <!-- ID card content will be populated here -->
-            <div class="p-5 text-center text-dark"><strong>Loading...</strong></div>
+<body class="id-page-extreme">
+    <!-- Aurora Nebula Background -->
+    <div class="aurora-container">
+        <div class="aurora-1"></div>
+        <div class="aurora-2"></div>
+        <div class="aurora-3"></div>
+        <div class="particles"></div>
+    </div>
+
+    <div class="grid-mesh"></div>
+    <div class="scanlines"></div>
+
+    <div class="d-flex flex-column align-items-center">
+        <!-- Assembly Container -->
+        <div class="assembly-wrapper" id="assembly-container">
+            <div class="fragment fragment-top"></div>
+            <div class="fragment fragment-bottom"></div>
+            <div class="fragment fragment-left"></div>
+            
+            <div class="bracket bracket-tl"></div>
+            <div class="bracket bracket-tr"></div>
+            <div class="bracket bracket-bl"></div>
+            <div class="bracket bracket-br"></div>
+            
+            <div class="lock-pulse"></div>
+
+            <!-- Fixed Height Content-Contained Card -->
+            <div class="anti-gravity-card" id="id-card">
+                <div class="p-5 text-center text-white h-100 d-flex flex-column justify-content-center">
+                    <div class="spinner-border text-info mx-auto" role="status"></div>
+                    <div class="mt-3 fw-bold tracking-widest" style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem;">INITIALIZING SECURE TERMINAL...</div>
+                </div>
+            </div>
         </div>
-        <div class="text-center mt-3">
-            <a href="index.html" class="btn btn-danger">Go Back</a>
+
+        <!-- Fixed Action Buttons Row -->
+        <div class="floating-actions-fixed">
+            <button class="btn-extreme btn-download-extreme" id="download-id-btn">
+                <span class="me-2">⬇</span> DOWNLOAD CARD
+            </button>
+            <a href="index.html" class="btn-extreme btn-logout-extreme text-decoration-none">
+                <span class="me-2">⏻</span> LOGOUT
+            </a>
         </div>
     </div>
+
+    <!-- SOS Interface -->
+    <div class="sos-trigger" id="sos-btn" title="Emergency SOS Mode">SOS</div>
+    
+    <div class="sos-overlay" id="sos-overlay">
+        <div class="sos-title">EMERGENCY MODE</div>
+        <div id="sos-content-target">
+            <!-- Populated by JS -->
+        </div>
+        <button class="btn-sos-exit" id="sos-exit-btn">EXIT EMERGENCY MODE</button>
+    </div>
+
     <script src="script.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", loadStudentCard);
-    </script>
 </body>
 
 </html>

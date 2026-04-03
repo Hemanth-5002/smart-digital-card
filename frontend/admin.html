@@ -36,15 +36,15 @@
                             <div class="mb-2"><input type="text" id="add-library" class="form-control"
                                     placeholder="Library Books Accessed" value="None"></div>
                             <div class="mb-2"><input type="text" id="add-contact" class="form-control"
-                                    placeholder="Contact Phone" required></div>
+                                    placeholder="Contact Phone"></div>
                             <div class="mb-2"><input type="email" id="add-email" class="form-control"
-                                    placeholder="Contact Email" required></div>
+                                    placeholder="Contact Email"></div>
                             <div class="mb-2"><label class="form-label mb-0 small">Date of Birth</label><input
-                                    type="date" id="add-dob" class="form-control" required></div>
+                                    type="date" id="add-dob" class="form-control"></div>
                             <div class="mb-2"><input type="text" id="add-marks" class="form-control"
-                                    placeholder="Marks / CGPA" required></div>
+                                    placeholder="Marks / CGPA"></div>
                             <div class="mb-2"><input type="text" id="add-linkedin" class="form-control"
-                                     placeholder="LinkedIn Profile Link" required></div>
+                                    placeholder="LinkedIn Profile Link"></div>
                             <div class="mb-2"><input type="text" id="add-resume" class="form-control"
                                     placeholder="Resume Link (URL)"></div>
                             <div class="mb-2"><input type="text" id="add-github" class="form-control"
@@ -53,13 +53,21 @@
                                     placeholder="10th Marks Card Link (URL)"></div>
                             <div class="mb-2"><input type="text" id="add-marks-puc" class="form-control"
                                     placeholder="PUC Marks Card Link (URL)"></div>
+                            <div class="mb-2"><input type="text" id="add-blood-group" class="form-control"
+                                    placeholder="Blood Group (e.g. O+)"></div>
+                            <div class="mb-2"><input type="text" id="add-emergency-contact" class="form-control"
+                                    placeholder="Emergency Contact Number"></div>
+                            <div class="mb-2"><input type="text" id="add-skills" class="form-control"
+                                    placeholder="Skills (e.g. Python, Java, UI Design)"></div>
 
                             <div class="mb-2 text-center">
                                 <small class="text-primary d-block mb-1">🔑 STUDENT SECURITY</small>
-                                <input type="text" id="add-password" class="form-control text-center fw-bold border-primary" placeholder="Set Password" value="123456">
+                                <input type="text" id="add-password"
+                                    class="form-control text-center fw-bold border-primary" placeholder="Set Password"
+                                    value="123456">
                             </div>
                             <div class="mb-2"><label class="form-label mb-0 small">Student Photo</label><input
-                                     type="file" id="add-photo" class="form-control" accept="image/*"></div>
+                                    type="file" id="add-photo" class="form-control" accept="image/*"></div>
                             <div class="mb-3">
                                 <select id="add-fees" class="form-control">
                                     <option value="Paid">Fees: Paid</option>
@@ -76,7 +84,8 @@
                 <div class="card shadow">
                     <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                         <span>Students List</span>
-                        <button id="refresh-qrs-btn" class="btn btn-sm btn-light text-primary fw-bold" title="Click this if QR codes don't work">Fix QR Codes</button>
+                        <button id="refresh-qrs-btn" class="btn btn-sm btn-light text-primary fw-bold"
+                            title="Click this if QR codes don't work">Fix QR Codes</button>
                     </div>
                     <div class="card-body table-responsive">
                         <table class="table table-striped table-hover table-sm">
@@ -99,9 +108,6 @@
         </div>
     </div>
     <script src="script.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", loadStudents);
-    </script>
 </body>
 
 </html>

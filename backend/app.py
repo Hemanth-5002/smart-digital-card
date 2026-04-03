@@ -12,11 +12,18 @@ NGROK_URL = None # Ngrok disabled as per user preference
 
 def get_local_ip():
     try:
+        # Standard way to find the primary IP
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('10.255.255.255', 1))
+        # Using 8.8.8.8 (Google DNS) as a dummy destination.
+        # It won't actually send any data.
+        s.connect(('8.8.8.8', 80))
         IP = s.getsockname()[0]
     except Exception:
-        IP = '127.0.0.1'
+        try:
+            # Fallback for offline environments
+            IP = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            IP = '127.0.0.1'
     finally:
         s.close()
     return IP
@@ -33,7 +40,7 @@ def serve_index():
 def serve_frontend(path):
     return send_from_directory(app.static_folder, path)
 
-DB_FILE = 'students_db.db'
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'students_db.db')
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -58,11 +65,23 @@ def init_db():
             resume TEXT,
             github TEXT,
             marks_10th TEXT,
-            marks_puc TEXT
+            marks_puc TEXT,
+            blood_group TEXT,
+            emergency_contact TEXT,
+            skills TEXT
         )
     ''')
     # Migrations for existing tables
-    columns = ["password TEXT NOT NULL DEFAULT '123456'", "resume TEXT", "github TEXT", "marks_10th TEXT", "marks_puc TEXT"]
+    columns = [
+        "password TEXT NOT NULL DEFAULT '123456'", 
+        "resume TEXT", 
+        "github TEXT", 
+        "marks_10th TEXT", 
+        "marks_puc TEXT",
+        "blood_group TEXT",
+        "emergency_contact TEXT",
+        "skills TEXT"
+    ]
     for col in columns:
         try:
             c.execute(f'ALTER TABLE students ADD COLUMN {col}')
@@ -101,11 +120,16 @@ def add_student():
     github = data.get('github', '')
     marks_10th = data.get('marks_10th', '')
     marks_puc = data.get('marks_puc', '')
+    blood_group = data.get('blood_group', 'N/A')
+    emergency_contact = data.get('emergency_contact', 'N/A')
+    skills = data.get('skills', '[]')
     
-    # Generate QR Code URL
-    local_ip = get_local_ip()
-    port = request.host.split(':')[-1] if ':' in request.host else '5000'
-    base_url = f"http://{local_ip}:{port}"
+    # Generate QR Code URL - Smart detection for local vs production
+    host = request.host.split(':')[0]
+    if host in ['localhost', '127.0.0.1']:
+        base_url = f"http://{get_local_ip()}:{request.host.split(':')[-1] if ':' in request.host else '5000'}"
+    else:
+        base_url = request.host_url.rstrip('/')
         
     qr_data = f"{base_url}/student.html?usn={register_number}&full=true"
     qr = qrcode.QRCode(version=1, box_size=6, border=4)
@@ -121,14 +145,17 @@ def add_student():
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
         c.execute('''
-            INSERT INTO students (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code, password, resume, github, marks_10th, marks_puc)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code_base64, password, resume, github, marks_10th, marks_puc))
+            INSERT INTO students (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code, password, resume, github, marks_10th, marks_puc, blood_group, emergency_contact, skills)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code_base64, password, resume, github, marks_10th, marks_puc, blood_group, emergency_contact, skills))
         conn.commit()
         conn.close()
         return jsonify({"message": "Student added successfully!"}), 201
-    except sqlite3.IntegrityError as e:
+    except sqlite3.IntegrityError:
         return jsonify({"error": "Register number already exists!"}), 400
+    except Exception as e:
+        print(f"ADD ERROR: {str(e)}")
+        return jsonify({"error": f"Database Error: {str(e)}"}), 500
 
 @app.route('/api/students/<register_number>', methods=['PUT'])
 def update_student(register_number):
@@ -150,11 +177,16 @@ def update_student(register_number):
     github = data.get('github')
     marks_10th = data.get('marks_10th', '')
     marks_puc = data.get('marks_puc', '')
+    blood_group = data.get('blood_group')
+    emergency_contact = data.get('emergency_contact')
+    skills = data.get('skills')
 
-    # Update QR Code with current base URL
-    local_ip = get_local_ip()
-    port = request.host.split(':')[-1] if ':' in request.host else '5000'
-    base_url = f"http://{local_ip}:{port}"
+    # Update QR Code with current host URL - Smart detection
+    host = request.host.split(':')[0]
+    if host in ['localhost', '127.0.0.1']:
+        base_url = f"http://{get_local_ip()}:{request.host.split(':')[-1] if ':' in request.host else '5000'}"
+    else:
+        base_url = request.host_url.rstrip('/')
     
     qr_data = f"{base_url}/student.html?usn={register_number}&full=true"
     qr = qrcode.QRCode(version=1, box_size=6, border=4)
@@ -165,32 +197,48 @@ def update_student(register_number):
     img.save(buffered, format="PNG")
     qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    
-    base_query = 'UPDATE students SET name=?, course=?, attendance=?, fees_status=?, library_books=?, contact=?, email=?, dob=?, marks=?, linkedin=?, qr_code=?, resume=?, github=?, marks_10th=?, marks_puc=?'
-    params = [name, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, qr_code_base64, resume, github, marks_10th, marks_puc]
-
-    if photo:
-        base_query += ', photo=?'
-        params.append(photo)
-    if password:
-        base_query += ', password=?'
-        params.append(password)
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
         
-    base_query += ' WHERE register_number=?'
-    params.append(register_number)
-    
-    c.execute(base_query, tuple(params))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Student updated successfully!"}), 200
+        base_query = 'UPDATE students SET name=?, course=?, attendance=?, fees_status=?, library_books=?, contact=?, email=?, dob=?, marks=?, linkedin=?, qr_code=?, resume=?, github=?, marks_10th=?, marks_puc=?'
+        params = [name, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, qr_code_base64, resume, github, marks_10th, marks_puc]
+
+        if blood_group:
+            base_query += ', blood_group=?'
+            params.append(blood_group)
+        if emergency_contact:
+            base_query += ', emergency_contact=?'
+            params.append(emergency_contact)
+        if skills:
+            base_query += ', skills=?'
+            params.append(skills)
+        if photo:
+            base_query += ', photo=?'
+            params.append(photo)
+        if password:
+            base_query += ', password=?'
+            params.append(password)
+            
+        base_query += ' WHERE register_number=?'
+        params.append(register_number)
+        
+        c.execute(base_query, tuple(params))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "Student updated successfully!"}), 200
+    except Exception as e:
+        print(f"UPDATE ERROR: {str(e)}")
+        return jsonify({"error": f"Database Update Error: {str(e)}"}), 500
 
 @app.route('/api/students/refresh-qrs', methods=['POST'])
 def refresh_all_qrs():
-    local_ip = get_local_ip()
-    port = request.host.split(':')[-1] if ':' in request.host else '5000'
-    base_url = f"http://{local_ip}:{port}"
+    # Refresh all QR codes with current host URL - Smart detection
+    host = request.host.split(':')[0]
+    if host in ['localhost', '127.0.0.1']:
+        base_url = f"http://{get_local_ip()}:{request.host.split(':')[-1] if ':' in request.host else '5000'}"
+    else:
+        base_url = request.host_url.rstrip('/')
     
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
