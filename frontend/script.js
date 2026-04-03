@@ -274,10 +274,22 @@ async function loadStudentCard() {
                         </div>
 
                         <div class="detail-sub-section mt-2">
-                            <div class="detail-title">ACADEMIC RECORDS</div>
+                            <div class="detail-title">ACADEMIC RECORDS (CLICK TO VIEW)</div>
                             <div class="marks-flex">
-                                <div class="mark-pill"><small>10TH</small> <span>${student.marks_10th || 'N/A'}</span></div>
-                                <div class="mark-pill"><small>PUC</small> <span>${student.marks_puc || 'N/A'}</span></div>
+                                ${student.marks_10th ? `
+                                <a href="${student.marks_10th}" target="_blank" class="mark-pill intel-link-pill">
+                                    <small>10TH</small> <span>View Doc</span>
+                                    ${student.verified_10th ? `<div class="govt-verify-badge" title="Verified by College Admin">✓</div>` : ''}
+                                </a>` : `
+                                <div class="mark-pill opacity-50"><small>10TH</small> <span>N/A</span></div>`}
+
+                                ${student.marks_puc ? `
+                                <a href="${student.marks_puc}" target="_blank" class="mark-pill intel-link-pill">
+                                    <small>PUC</small> <span>View Doc</span>
+                                    ${student.verified_puc ? `<div class="govt-verify-badge" title="Verified by College Admin">✓</div>` : ''}
+                                </a>` : `
+                                <div class="mark-pill opacity-50"><small>PUC</small> <span>N/A</span></div>`}
+                                
                                 <div class="mark-pill"><small>AGG</small> <span>${student.marks || 'N/A'}</span></div>
                             </div>
                         </div>

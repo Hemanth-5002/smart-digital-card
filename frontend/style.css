@@ -754,8 +754,21 @@ body {
     flex-direction: column;
     align-items: center;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.5); /* Fixed: Better background for links */
     position: relative; /* Fixed: Added relative positioning for the badge */
     min-width: 60px;
+}
+
+.intel-link-pill {
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.intel-link-pill:hover {
+    background: rgba(0, 245, 255, 0.1);
+    border-color: var(--electric-cyan);
+    box-shadow: 0 0 15px rgba(0, 245, 255, 0.2);
+    transform: translateY(-2px);
 }
 
 .govt-verify-badge {

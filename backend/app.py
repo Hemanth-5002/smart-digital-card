@@ -43,7 +43,7 @@ def serve_frontend(path):
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'students_db.db')
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS students (
@@ -92,7 +92,7 @@ def init_db():
 
 @app.route('/api/students', methods=['GET'])
 def get_students():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute('SELECT * FROM students')
@@ -142,7 +142,7 @@ def add_student():
     qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
     
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, timeout=10)
         c = conn.cursor()
         c.execute('''
             INSERT INTO students (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code, password, resume, github, marks_10th, marks_puc, blood_group, emergency_contact, skills)
@@ -198,7 +198,7 @@ def update_student(register_number):
     qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, timeout=10)
         c = conn.cursor()
         
         base_query = 'UPDATE students SET name=?, course=?, attendance=?, fees_status=?, library_books=?, contact=?, email=?, dob=?, marks=?, linkedin=?, qr_code=?, resume=?, github=?, marks_10th=?, marks_puc=?'
@@ -240,7 +240,7 @@ def refresh_all_qrs():
     else:
         base_url = request.host_url.rstrip('/')
     
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute('SELECT register_number FROM students')
@@ -264,7 +264,7 @@ def refresh_all_qrs():
 
 @app.route('/api/students/<register_number>', methods=['GET'])
 def get_student(register_number):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute('SELECT * FROM students WHERE register_number = ?', (register_number,))
