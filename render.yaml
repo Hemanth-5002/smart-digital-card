@@ -7,3 +7,11 @@ services:
     envVars:
       - key: PORT
         value: 5000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-card-db
+          property: connectionString
+
+databases:
+  - name: smart-card-db
+    plan: free

@@ -5,3 +5,4 @@ Pillow
 gunicorn
 python-pptx
 requests
+psycopg2-binary

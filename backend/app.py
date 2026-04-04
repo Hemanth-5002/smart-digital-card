@@ -7,8 +7,37 @@ from io import BytesIO
 import base64
 import socket
 
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except ImportError:
+    psycopg2 = None
+
 # --- SETTINGS ---
-NGROK_URL = None # Ngrok disabled as per user preference
+NGROK_URL = None 
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+def get_db_connection():
+    if DATABASE_URL and psycopg2:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    else:
+        conn = sqlite3.connect(DB_FILE, timeout=10)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+def get_cursor(conn):
+    if DATABASE_URL and psycopg2:
+        return conn.cursor(cursor_factory=RealDictCursor)
+    else:
+        return conn.cursor()
+
+def get_placeholder():
+    return "%s" if (DATABASE_URL and psycopg2) else "?"
+
+def dict_from_row(row):
+    if not row: return None
+    return dict(row) if not isinstance(row, dict) else row
 
 def get_local_ip():
     try:
@@ -43,60 +72,89 @@ def serve_frontend(path):
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'students_db.db')
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE, timeout=10)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            register_number TEXT UNIQUE NOT NULL,
-            course TEXT NOT NULL,
-            attendance TEXT NOT NULL,
-            fees_status TEXT NOT NULL,
-            library_books TEXT,
-            contact TEXT,
-            email TEXT,
-            dob TEXT,
-            marks TEXT,
-            linkedin TEXT,
-            photo TEXT,
-            qr_code TEXT,
-            password TEXT NOT NULL DEFAULT '123456',
-            resume TEXT,
-            github TEXT,
-            marks_10th TEXT,
-            marks_puc TEXT,
-            blood_group TEXT,
-            emergency_contact TEXT,
-            skills TEXT
-        )
-    ''')
-    # Migrations for existing tables
-    columns = [
-        "password TEXT NOT NULL DEFAULT '123456'", 
-        "resume TEXT", 
-        "github TEXT", 
-        "marks_10th TEXT", 
-        "marks_puc TEXT",
-        "blood_group TEXT",
-        "emergency_contact TEXT",
-        "skills TEXT"
-    ]
-    for col in columns:
-        try:
-            c.execute(f'ALTER TABLE students ADD COLUMN {col}')
-        except sqlite3.OperationalError:
-            pass
+    conn = get_db_connection()
+    c = get_cursor(conn)
+    if DATABASE_URL:
+        # PostgreSQL
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS students (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                register_number TEXT UNIQUE NOT NULL,
+                course TEXT NOT NULL,
+                attendance TEXT NOT NULL,
+                fees_status TEXT NOT NULL,
+                library_books TEXT,
+                contact TEXT,
+                email TEXT,
+                dob TEXT,
+                marks TEXT,
+                linkedin TEXT,
+                photo TEXT,
+                qr_code TEXT,
+                password TEXT NOT NULL DEFAULT '123456',
+                resume TEXT,
+                github TEXT,
+                marks_10th TEXT,
+                marks_puc TEXT,
+                blood_group TEXT,
+                emergency_contact TEXT,
+                skills TEXT
+            )
+        ''')
+    else:
+        # SQLite
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS students (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                register_number TEXT UNIQUE NOT NULL,
+                course TEXT NOT NULL,
+                attendance TEXT NOT NULL,
+                fees_status TEXT NOT NULL,
+                library_books TEXT,
+                contact TEXT,
+                email TEXT,
+                dob TEXT,
+                marks TEXT,
+                linkedin TEXT,
+                photo TEXT,
+                qr_code TEXT,
+                password TEXT NOT NULL DEFAULT '123456',
+                resume TEXT,
+                github TEXT,
+                marks_10th TEXT,
+                marks_puc TEXT,
+                blood_group TEXT,
+                emergency_contact TEXT,
+                skills TEXT
+            )
+        ''')
+        # Migrations for existing SQLite tables
+        columns = [
+            "password TEXT NOT NULL DEFAULT '123456'", 
+            "resume TEXT", 
+            "github TEXT", 
+            "marks_10th TEXT", 
+            "marks_puc TEXT",
+            "blood_group TEXT",
+            "emergency_contact TEXT",
+            "skills TEXT"
+        ]
+        for col in columns:
+            try:
+                c.execute(f'ALTER TABLE students ADD COLUMN {col}')
+            except sqlite3.OperationalError:
+                pass
     conn.commit()
     conn.close()
 
 @app.route('/api/students', methods=['GET'])
 def get_students():
-    conn = sqlite3.connect(DB_FILE, timeout=10)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_cursor(conn)
     c.execute('SELECT * FROM students')
-    students = [dict(row) for row in c.fetchall()]
+    students = [dict_from_row(row) for row in c.fetchall()]
     conn.close()
     return jsonify(students)
 
@@ -142,16 +200,17 @@ def add_student():
     qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
     
     try:
-        conn = sqlite3.connect(DB_FILE, timeout=10)
-        c = conn.cursor()
-        c.execute('''
+        conn = get_db_connection()
+        c = get_cursor(conn)
+        p = get_placeholder()
+        c.execute(f'''
             INSERT INTO students (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code, password, resume, github, marks_10th, marks_puc, blood_group, emergency_contact, skills)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
         ''', (name, register_number, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, photo, qr_code_base64, password, resume, github, marks_10th, marks_puc, blood_group, emergency_contact, skills))
         conn.commit()
         conn.close()
         return jsonify({"message": "Student added successfully!"}), 201
-    except sqlite3.IntegrityError:
+    except (sqlite3.IntegrityError, (psycopg2.IntegrityError if psycopg2 else Exception)) as e:
         return jsonify({"error": "Register number already exists!"}), 400
     except Exception as e:
         print(f"ADD ERROR: {str(e)}")
@@ -198,29 +257,30 @@ def update_student(register_number):
     qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
     try:
-        conn = sqlite3.connect(DB_FILE, timeout=10)
-        c = conn.cursor()
+        conn = get_db_connection()
+        c = get_cursor(conn)
+        p = get_placeholder()
         
-        base_query = 'UPDATE students SET name=?, course=?, attendance=?, fees_status=?, library_books=?, contact=?, email=?, dob=?, marks=?, linkedin=?, qr_code=?, resume=?, github=?, marks_10th=?, marks_puc=?'
+        base_query = f'UPDATE students SET name={p}, course={p}, attendance={p}, fees_status={p}, library_books={p}, contact={p}, email={p}, dob={p}, marks={p}, linkedin={p}, qr_code={p}, resume={p}, github={p}, marks_10th={p}, marks_puc={p}'
         params = [name, course, attendance, fees_status, library_books, contact, email, dob, marks, linkedin, qr_code_base64, resume, github, marks_10th, marks_puc]
 
         if blood_group:
-            base_query += ', blood_group=?'
+            base_query += f', blood_group={p}'
             params.append(blood_group)
         if emergency_contact:
-            base_query += ', emergency_contact=?'
+            base_query += f', emergency_contact={p}'
             params.append(emergency_contact)
         if skills:
-            base_query += ', skills=?'
+            base_query += f', skills={p}'
             params.append(skills)
         if photo:
-            base_query += ', photo=?'
+            base_query += f', photo={p}'
             params.append(photo)
         if password:
-            base_query += ', password=?'
+            base_query += f', password={p}'
             params.append(password)
             
-        base_query += ' WHERE register_number=?'
+        base_query += f' WHERE register_number={p}'
         params.append(register_number)
         
         c.execute(base_query, tuple(params))
@@ -240,9 +300,9 @@ def refresh_all_qrs():
     else:
         base_url = request.host_url.rstrip('/')
     
-    conn = sqlite3.connect(DB_FILE, timeout=10)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
+    conn = get_db_connection()
+    c = get_cursor(conn)
+    p = get_placeholder()
     c.execute('SELECT register_number FROM students')
     students = c.fetchall()
     
@@ -256,7 +316,7 @@ def refresh_all_qrs():
         buffered = BytesIO()
         img.save(buffered, format="PNG")
         qr_code_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        c.execute('UPDATE students SET qr_code=? WHERE register_number=?', (qr_code_base64, usn))
+        c.execute(f'UPDATE students SET qr_code={p} WHERE register_number={p}', (qr_code_base64, usn))
     
     conn.commit()
     conn.close()
@@ -264,14 +324,14 @@ def refresh_all_qrs():
 
 @app.route('/api/students/<register_number>', methods=['GET'])
 def get_student(register_number):
-    conn = sqlite3.connect(DB_FILE, timeout=10)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM students WHERE register_number = ?', (register_number,))
+    conn = get_db_connection()
+    c = get_cursor(conn)
+    p = get_placeholder()
+    c.execute(f'SELECT * FROM students WHERE register_number = {p}', (register_number,))
     student = c.fetchone()
     conn.close()
     if student:
-        return jsonify(dict(student))
+        return jsonify(dict_from_row(student))
     return jsonify({"error": "Student not found!"}), 404
 
 @app.route('/api/login', methods=['POST'])
@@ -279,10 +339,10 @@ def student_login():
     data = request.json
     usn = data.get('usn')
     password = data.get('password')
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute('SELECT * FROM students WHERE register_number = ? AND password = ?', (usn, password))
+    conn = get_db_connection()
+    c = get_cursor(conn)
+    p = get_placeholder()
+    c.execute(f'SELECT * FROM students WHERE register_number = {p} AND password = {p}', (usn, password))
     student = c.fetchone()
     conn.close()
     if student:
@@ -291,9 +351,10 @@ def student_login():
 
 @app.route('/api/students/<register_number>', methods=['DELETE'])
 def delete_student(register_number):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('DELETE FROM students WHERE register_number = ?', (register_number,))
+    conn = get_db_connection()
+    c = get_cursor(conn)
+    p = get_placeholder()
+    c.execute(f'DELETE FROM students WHERE register_number = {p}', (register_number,))
     conn.commit()
     conn.close()
     return jsonify({"message": "Student deleted successfully!"}), 200
