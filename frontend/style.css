@@ -1046,3 +1046,265 @@ body.sos-active .sos-overlay {
         background: white !important;
     }
 }
+
+/* --- UNIQUE FEATURES: ACHIEVEMENTS & PATHFINDER --- */
+
+.achievement-badges-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    padding: 0 10px;
+}
+
+.badge-item {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(0, 245, 255, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+    position: relative;
+    cursor: help;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.badge-item:hover {
+    transform: scale(1.2) translateY(-5px);
+    border-color: var(--electric-cyan);
+    box-shadow: 0 0 20px rgba(0, 245, 255, 0.4);
+    z-index: 10;
+}
+
+.badge-item::after {
+    content: attr(data-title);
+    position: absolute;
+    bottom: -45px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(5, 8, 24, 0.95);
+    color: var(--electric-cyan);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    font-family: 'Space Mono', monospace;
+    z-index: 100;
+    border: 1px solid rgba(0, 245, 255, 0.3);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.badge-item:hover::after {
+    opacity: 1;
+    bottom: -40px;
+}
+
+/* Pathfinder Trigger Button */
+.pathfinder-trigger {
+    background: linear-gradient(135deg, #00f5ff 0%, #0055ff 100%);
+    color: #000;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 50px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin: 20px auto;
+    display: block;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 245, 255, 0.4);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    position: relative;
+    overflow: hidden;
+}
+
+.pathfinder-trigger::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+    transform: rotate(45deg);
+    transition: 0.5s;
+}
+
+.pathfinder-trigger:hover::before {
+    left: 100%;
+}
+
+.pathfinder-trigger:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0 35px rgba(0, 245, 255, 0.6);
+}
+
+/* Pathfinder Overlay */
+.pathfinder-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(2, 8, 24, 0.98);
+    z-index: 3000;
+    padding: 40px 20px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+}
+
+.pathfinder-overlay.active {
+    display: flex;
+}
+
+.pathfinder-content {
+    width: 100%;
+    max-width: 500px;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.pathfinder-title {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--electric-cyan);
+    font-size: 1.8rem;
+    margin-bottom: 5px;
+    text-align: center;
+    text-shadow: 0 0 15px rgba(0, 245, 255, 0.5);
+}
+
+.pathfinder-subtitle {
+    font-family: 'Space Mono', monospace;
+    color: #888;
+    font-size: 0.8rem;
+    text-align: center;
+    margin-bottom: 30px;
+    display: block;
+}
+
+.road-node {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 4px solid var(--electric-cyan);
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 0 15px 15px 0;
+    position: relative;
+    border: 1px solid rgba(0, 245, 255, 0.1);
+}
+
+.node-step {
+    font-size: 0.65rem;
+    color: #66ccff;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+}
+
+.node-title {
+    font-weight: 700;
+    font-size: 1.2rem;
+    margin: 8px 0;
+    font-family: 'Orbitron', sans-serif;
+    color: #fff;
+}
+
+.node-desc {
+    font-size: 0.85rem;
+    color: #aaa;
+    line-height: 1.5;
+}
+
+/* Academic Pulse Meter */
+.academic-pulse-container {
+    width: 110px;
+    height: 110px;
+    margin: 20px auto;
+    position: relative;
+}
+
+.pulse-svg {
+    transform: rotate(-90deg);
+}
+
+.pulse-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.05);
+    stroke-width: 10;
+}
+
+.pulse-fill {
+    fill: none;
+    stroke: var(--electric-cyan);
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 2s ease-in-out;
+    filter: drop-shadow(0 0 8px var(--electric-cyan));
+    stroke-dasharray: 282.7; /* 2 * PI * 45 */
+    stroke-dashoffset: 282.7;
+}
+
+.pulse-value-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    color: white;
+    text-align: center;
+}
+
+.pulse-label {
+    font-size: 0.5rem;
+    color: #66ccff;
+    display: block;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Public Mode Privacy */
+.public-mode-hidden {
+    display: none !important;
+}
+
+.close-pathfinder {
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+.close-pathfinder:hover {
+    background: rgba(255, 0, 0, 0.3);
+    border-color: #ff0000;
+    transform: rotate(90deg);
+}

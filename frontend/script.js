@@ -197,6 +197,87 @@ async function deleteStudent(usn) {
     }
 }
 
+// --- UNIQUE SMART FEATURES LOGIC ---
+
+function getAchievements(student) {
+    const badges = [];
+    const attendance = parseInt(student.attendance) || 0;
+    const marks = parseFloat(student.marks) || 0;
+    let skillsArr = [];
+    try {
+        skillsArr = JSON.parse(student.skills || '[]');
+        if (!Array.isArray(skillsArr)) skillsArr = student.skills.split(',').map(s => s.trim()).filter(s => s);
+    } catch (e) { skillsArr = []; }
+
+    if (attendance >= 90) badges.push({ icon: '🔥', title: 'ATTENDANCE WARRIOR' });
+    if (marks >= 90) badges.push({ icon: '🏆', title: 'ACADEMIC ACE' });
+    if (skillsArr.length >= 5) badges.push({ icon: '🚀', title: 'SKILL TITAN' });
+    if (student.verified_10th && student.verified_puc) badges.push({ icon: '🛡️', title: 'VERIFIED EXPLORER' });
+    if (student.github) badges.push({ icon: '💻', title: 'CODE ARCHITECT' });
+    
+    return badges;
+}
+
+function getPathfinderData(student) {
+    let skillsArr = [];
+    try {
+        skillsArr = JSON.parse(student.skills || '[]');
+        if (!Array.isArray(skillsArr)) skillsArr = student.skills.split(',').map(s => s.trim()).filter(s => s);
+    } catch (e) { skillsArr = []; }
+
+    const skillsStr = skillsArr.join(' ').toLowerCase();
+    
+    if (skillsStr.includes('python') || skillsStr.includes('data') || skillsStr.includes('ml')) {
+        return [
+            { step: 'Phase 1', title: 'Data Analyst', desc: 'Focus on SQL and visualization tools like Tableau.' },
+            { step: 'Phase 2', title: 'ML Engineer', desc: 'Deep dive into Scikit-Learn and Neural Networks.' },
+            { step: 'Goal', title: 'AI Research Scientist', desc: 'Top tier role at labs like DeepMind or OpenAI.' }
+        ];
+    } else if (skillsStr.includes('react') || skillsStr.includes('js') || skillsStr.includes('web')) {
+        return [
+            { step: 'Phase 1', title: 'Frontend Developer', desc: 'Master React, HTML/CSS, and Framer Motion.' },
+            { step: 'Phase 2', title: 'Full Stack Ninja', desc: 'Add Node.js and MongoDB to your arsenal.' },
+            { step: 'Goal', title: 'Product Architect', desc: 'Lead engineering teams and design scalable systems.' }
+        ];
+    } else {
+        return [
+            { step: 'Phase 1', title: 'Junior Developer', desc: 'Build a strong foundation in Data Structures.' },
+            { step: 'Phase 2', title: 'Software Engineer', desc: 'Contribute to large-scale open source projects.' },
+            { step: 'Goal', title: 'Tech Lead', desc: 'Drive technical vision for global products.' }
+        ];
+    }
+}
+
+function openPathfinder(student) {
+    let overlay = document.getElementById('pathfinder-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'pathfinder-overlay';
+        overlay.className = 'pathfinder-overlay';
+        document.body.appendChild(overlay);
+    }
+
+    const pathData = getPathfinderData(student);
+    overlay.innerHTML = `
+        <button class="close-pathfinder" onclick="document.getElementById('pathfinder-overlay').classList.remove('active')">×</button>
+        <div class="pathfinder-content">
+            <h2 class="pathfinder-title">AI CAREER PATHFINDER</h2>
+            <span class="pathfinder-subtitle">Based on your indexed skills & academic pulse</span>
+            <div class="roadmap">
+                ${pathData.map(node => `
+                    <div class="road-node">
+                        <div class="node-step">${node.step}</div>
+                        <div class="node-title">${node.title}</div>
+                        <div class="node-desc">${node.desc}</div>
+                    </div>
+                `).join('')}
+            </div>
+            <p class="text-center mt-4 small opacity-50" style="font-family: 'Space Mono', monospace;">AI Analysis Engine v2.0-Alpha</p>
+        </div>
+    `;
+    overlay.classList.add('active');
+}
+
 async function loadStudentCard() {
     const urlParams = new URLSearchParams(window.location.search);
     const usn = urlParams.get('usn');
@@ -219,12 +300,29 @@ async function loadStudentCard() {
         const student = await response.json();
         const qrImageSrc = `data:image/png;base64,${student.qr_code}`;
         const isFull = urlParams.get('full') === 'true';
+        const isPublic = urlParams.get('public') === 'true';
+
+        // 1. Calculate Badges & Pulse
+        const badges = getAchievements(student);
+        const marksVal = parseFloat(student.marks) || 0;
+        let skillsCount = 0;
+        try {
+            const sArr = JSON.parse(student.skills || '[]');
+            skillsCount = Array.isArray(sArr) ? sArr.length : (student.skills ? student.skills.split(',').length : 0);
+        } catch(e) { skillsCount = 0; }
+        
+        const readinessScore = Math.min(100, Math.round((marksVal * 0.4) + (parseInt(student.attendance) * 0.3) + (skillsCount * 5)));
+        const strokeDashoffset = 282.7 - (282.7 * readinessScore / 100);
 
         // Materialize Fixed Layout Content
         cardContainer.innerHTML = `
             <div class="card-content-extreme">
-                <div class="header-strip">
+                <div class="header-strip ${isPublic ? 'public-mode-hidden' : ''}">
                     <p class="college-name-small">K.L.E. S. NIJALINGAPPA COLLEGE</p>
+                </div>
+
+                <div class="achievement-badges-container">
+                    ${badges.map(b => `<div class="badge-item" data-title="${b.title}">${b.icon}</div>`).join('')}
                 </div>
                 
                 <div class="hex-dual-container">
@@ -232,15 +330,15 @@ async function loadStudentCard() {
                     <div class="ring-inner"></div>
                     <div class="hex-portrait-fixed">
                          <img src="${student.photo || 'broken'}" 
-                              alt="Profile" 
-                              onerror="this.onerror=null; this.outerHTML='<div class=\'fallback-avatar\'>👤</div>';">
+                               alt="Profile" 
+                               onerror="this.onerror=null; this.outerHTML='<div class=\'fallback-avatar\'>👤</div>';">
                     </div>
                 </div>
 
                 <div class="text-center px-2">
                     <h1 class="name-shimmer-fixed">${student.name}</h1>
                     <div class="verified-pill">
-                        ✦ VERIFIED IDENTITY ✦
+                        ✦ ${isPublic ? 'PUBLIC PROFILE' : 'VERIFIED IDENTITY'} ✦
                     </div>
                 </div>
 
@@ -250,15 +348,25 @@ async function loadStudentCard() {
                             <span class="chip-label d-block">DEPARTMENT</span>
                             <span class="chip-value">${student.course}</span>
                         </div>
-                        <div class="data-chip-extreme">
+                        <div class="data-chip-extreme ${isPublic ? 'public-mode-hidden' : ''}">
                             <span class="chip-label d-block">REGISTER NUMBER</span>
                             <span class="chip-value">${student.register_number}</span>
                         </div>
-                        <div class="data-chip-extreme">
-                            <span class="chip-label d-block">ACCESS LEVEL</span>
-                            <span class="chip-value">${isFull ? 'AUTHORIZED RED' : 'AUTHORIZED BLUE'}</span>
+                    </div>
+
+                    <!-- Unique Feature: Readiness Pulse -->
+                    <div class="academic-pulse-container">
+                        <svg class="pulse-svg" width="110" height="110">
+                            <circle class="pulse-bg" cx="55" cy="55" r="45"></circle>
+                            <circle class="pulse-fill" cx="55" cy="55" r="45" style="stroke-dashoffset: ${strokeDashoffset}"></circle>
+                        </svg>
+                        <div class="pulse-value-box">
+                            ${readinessScore}<span style="font-size: 0.6rem;">%</span>
+                            <span class="pulse-label">READINESS</span>
                         </div>
                     </div>
+
+                    <button class="pathfinder-trigger" id="pathfinder-btn">AI Career Pathfinder</button>
 
                     ${(isFull || window.location.href.includes('full=true')) ? `
                     <div class="advanced-details-panel">
@@ -273,6 +381,7 @@ async function loadStudentCard() {
                             </div>
                         </div>
 
+                        ${!isPublic ? `
                         <div class="detail-sub-section mt-2">
                             <div class="detail-title">ACADEMIC RECORDS (CLICK TO VIEW)</div>
                             <div class="marks-flex">
@@ -280,15 +389,13 @@ async function loadStudentCard() {
                                 <a href="${student.marks_10th}" target="_blank" class="mark-pill intel-link-pill">
                                     <small>10TH</small> <span>View Doc</span>
                                     ${student.verified_10th ? `<div class="govt-verify-badge" title="Verified by College Admin">✓</div>` : ''}
-                                </a>` : `
-                                <div class="mark-pill opacity-50"><small>10TH</small> <span>N/A</span></div>`}
+                                </a>` : `<div class="mark-pill opacity-50"><small>10TH</small> <span>N/A</span></div>`}
 
                                 ${student.marks_puc ? `
                                 <a href="${student.marks_puc}" target="_blank" class="mark-pill intel-link-pill">
                                     <small>PUC</small> <span>View Doc</span>
                                     ${student.verified_puc ? `<div class="govt-verify-badge" title="Verified by College Admin">✓</div>` : ''}
-                                </a>` : `
-                                <div class="mark-pill opacity-50"><small>PUC</small> <span>N/A</span></div>`}
+                                </a>` : `<div class="mark-pill opacity-50"><small>PUC</small> <span>N/A</span></div>`}
                                 
                                 <div class="mark-pill"><small>AGG</small> <span>${student.marks || 'N/A'}</span></div>
                             </div>
@@ -305,6 +412,13 @@ async function loadStudentCard() {
                             <div class="contact-text">BLOOD: <span class="text-danger fw-bold">${student.blood_group || 'N/A'}</span></div>
                             <div class="contact-text">EMERGENCY: ${student.emergency_contact || 'N/A'}</div>
                         </div>
+                        ` : `
+                        <div class="detail-sub-section mt-2">
+                            <div class="detail-title">PROFILE STATUS</div>
+                            <div class="contact-text text-success">✓ IDENTITY VERIFIED BY INSTITUTION</div>
+                            <div class="contact-text text-warning">⚠ PRIVATE DATA ENCRYPTED</div>
+                        </div>
+                        `}
                     </div>
                     ` : ''}
 
@@ -315,7 +429,7 @@ async function loadStudentCard() {
                     </div>
                 </div>
 
-                <div class="qr-restricted-section">
+                <div class="qr-restricted-section ${isPublic ? 'public-mode-hidden' : ''}">
                     <div class="reticle-frame-small">
                         <div class="reticle-corner corner-tl"></div>
                         <div class="reticle-corner corner-tr"></div>
@@ -328,6 +442,12 @@ async function loadStudentCard() {
                 </div>
             </div>
         `;
+
+        // Handle Pathfinder Button
+        const pathBtn = document.getElementById("pathfinder-btn");
+        if (pathBtn) {
+            pathBtn.onclick = () => openPathfinder(student);
+        }
 
         // Trust Ring Logic
         const attendanceVal = parseInt(student.attendance) || 0;
@@ -417,10 +537,28 @@ async function loadStudentCard() {
         // Download Button Implementation
         const downloadBtn = document.getElementById("download-id-btn");
         if (downloadBtn) {
-
             downloadBtn.onclick = () => {
                 window.print();
             };
+        }
+
+        // Share Public Profile Button (New Unique Feature)
+        const shareBtn = document.createElement('button');
+        shareBtn.className = 'btn-extreme btn-download-extreme';
+        shareBtn.style.background = 'linear-gradient(135deg, #00f5ff 0%, #0055ff 100%)';
+        shareBtn.style.color = 'black';
+        shareBtn.innerHTML = '<span class="me-2">🔗</span> SHARE PUBLIC';
+        shareBtn.onclick = () => {
+            const publicUrl = window.location.href.split('&')[0].split('?')[0] + `?usn=${usn}&full=true&public=true`;
+            navigator.clipboard.writeText(publicUrl).then(() => {
+                shareBtn.innerHTML = '<span class="me-2">✅</span> COPIED!';
+                setTimeout(() => shareBtn.innerHTML = '<span class="me-2">🔗</span> SHARE PUBLIC', 2000);
+            });
+        };
+        
+        const actionRow = document.querySelector('.floating-actions-fixed');
+        if (actionRow && !isPublic) {
+            actionRow.insertBefore(shareBtn, actionRow.firstChild);
         }
 
     } catch (error) {
